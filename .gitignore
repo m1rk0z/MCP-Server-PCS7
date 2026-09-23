@@ -1,0 +1,13 @@
+# build
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+
+# la cartella release/ e' versionata di proposito (binari gia' pubblicati)
+!release/
+!release/**
+
+# export, log e file generati dal server
+export/
+*.log
