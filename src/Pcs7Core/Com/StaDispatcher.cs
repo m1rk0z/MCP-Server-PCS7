@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace Pcs7Mcp.Com;
+namespace Pcs7Core.Com;
 
 /// <summary>
 /// Runs every COM call on one dedicated STA thread. The SIMATIC command interface is an

@@ -1,19 +1,25 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Opc.Ua;
 using Opc.Ua.Client;
 using Opc.Ua.Configuration;
 
-namespace Pcs7Mcp.OpcUa;
+namespace Pcs7Core.OpcUa;
 
 /// <summary>OPC UA client towards the OpenPCS 7 UA server (runtime process data).</summary>
-public sealed class OpcUaSession : IAsyncDisposable
+public sealed class OpcUaSession : IDisposable
 {
-    private readonly ServerOptions _options;
+    private readonly CoreOptions _options;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ApplicationConfiguration? _config;
     private ISession? _session;
     private string? _endpointUrl;
 
-    public OpcUaSession(ServerOptions options) => _options = options;
+    public OpcUaSession(CoreOptions options) => _options = options;
 
     private async Task<ApplicationConfiguration> ConfigAsync()
     {
@@ -58,16 +64,16 @@ public sealed class OpcUaSession : IAsyncDisposable
         if (_session is not null) { try { await _session.CloseAsync(); } catch { } _session.Dispose(); _session = null; }
 
         var config = await ConfigAsync();
-        var useSecurity = !string.Equals(Environment.GetEnvironmentVariable("PCS7_MCP_OPCUA_SECURITY"), "none", StringComparison.OrdinalIgnoreCase);
+        var useSecurity = _options.OpcUaUseSecurity;
         EndpointDescription selected;
         try { selected = CoreClientUtils.SelectEndpoint(config, url, useSecurity, 15000); }
         catch when (useSecurity) { selected = CoreClientUtils.SelectEndpoint(config, url, false, 15000); }
 
         var endpoint = new ConfiguredEndpoint(null, selected, EndpointConfiguration.Create(config));
-        var user = Environment.GetEnvironmentVariable("PCS7_MCP_OPCUA_USER");
+        var user = _options.OpcUaUser;
         IUserIdentity identity = string.IsNullOrEmpty(user)
             ? new UserIdentity(new AnonymousIdentityToken())
-            : new UserIdentity(user, System.Text.Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("PCS7_MCP_OPCUA_PASSWORD") ?? ""));
+            : new UserIdentity(user, System.Text.Encoding.UTF8.GetBytes(_options.OpcUaPassword ?? ""));
 
         _session = await Session.Create(config, endpoint, false, "pcs7-mcp", 60000, identity, null);
         _endpointUrl = url;
@@ -107,10 +113,10 @@ public sealed class OpcUaSession : IAsyncDisposable
             ReferenceTypeId = ReferenceTypeIds.HierarchicalReferences,
             IncludeSubtypes = true,
             NodeClassMask = (int)(NodeClass.Object | NodeClass.Variable | NodeClass.Method),
-            MaxReferencesReturned = (uint)Math.Clamp(maxResults, 1, 5000),
+            MaxReferencesReturned = (uint)Compat.Clamp(maxResults, 1, 5000),
         };
         var refs = await Task.Run(() => browser.Browse(start));
-        var children = refs.Take(Math.Clamp(maxResults, 1, 5000)).Select(r => new
+        var children = refs.Take(Compat.Clamp(maxResults, 1, 5000)).Select(r => new
         {
             nodeId = ExpandedNodeId.ToNodeId(r.NodeId, s.NamespaceUris)?.ToString(),
             browseName = r.BrowseName.ToString(),
@@ -172,8 +178,11 @@ public sealed class OpcUaSession : IAsyncDisposable
         };
     });
 
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
-        if (_session is not null) { try { await _session.CloseAsync(); } catch { } _session.Dispose(); }
+        if (_session is null) return;
+        // Off the caller's thread (the agent calls this from the WinForms UI thread) and bounded, so exit cannot hang.
+        try { Task.Run(() => _session.CloseAsync()).Wait(TimeSpan.FromSeconds(5)); } catch { }
+        try { _session.Dispose(); } catch { }
     }
 }

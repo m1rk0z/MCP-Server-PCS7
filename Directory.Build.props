@@ -1,0 +1,7 @@
+<Project>
+  <!-- Reproducible binaries: no local folder (and user name) embedded in DLLs and PDB references. -->
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)=/pcs7-mcp/</PathMap>
+  </PropertyGroup>
+</Project>

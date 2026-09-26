@@ -1,8 +1,10 @@
+using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 
-namespace Pcs7Mcp.Com;
+namespace Pcs7Core.Com;
 
 /// <summary>Late-bound IDispatch helpers (must be called on the STA thread).</summary>
 public static class ComObj
@@ -42,7 +44,7 @@ public static class ComObj
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var result = ItemsCore(collection, out var method);
         if (sw.ElapsedMilliseconds > 2000)
-            Console.Error.WriteLine($"[pcs7-mcp] enumerated {result.Count} items via {method} in {sw.ElapsedMilliseconds} ms");
+            CoreLog.Write($"enumerated {result.Count} items via {method} in {sw.ElapsedMilliseconds} ms");
         return result;
     }
 

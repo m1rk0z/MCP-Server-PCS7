@@ -1,4 +1,6 @@
-namespace Pcs7Mcp.Simatic;
+using System;
+
+namespace Pcs7Core.Simatic;
 
 /// <summary>Constants from the S7ABATCX type library (STEP 7 V5.7 command interface).</summary>
 public static class S7Constants

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Agent installed on the PCS 7 machine (VM). .NET Framework 4.8 x86: runs on Windows 7 SP1, 8.1, 10, 11
+    and Server 2008 R2 SP1 ... 2022, 32 or 64 bit. Exposes the PCS 7 operations to Pcs7McpServer over HTTP.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <PlatformTarget>x86</PlatformTarget>
+    <AssemblyName>Pcs7Agent</AssemblyName>
+    <RootNamespace>Pcs7Agent</RootNamespace>
+    <Version>1.1.0</Version>
+    <Product>PCS7 MCP Agent</Product>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <NoWarn>$(NoWarn);CS0618;CS8632</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <ProjectReference Include="..\Pcs7Core\Pcs7Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- setup.cmd, disinstalla.cmd, LEGGIMI.txt at the root of the package -->
+    <None Include="dist\**" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
