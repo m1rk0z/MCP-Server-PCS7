@@ -15,15 +15,14 @@ namespace Pcs7CfcReader
     /// </summary>
     internal static class Program
     {
-        private const string S7Bin = @"C:\Program Files (x86)\SIEMENS\STEP7\S7BIN";
-
         [STAThread]
         private static int Main(string[] args)
         {
-            Environment.SetEnvironmentVariable("PATH", S7Bin + ";" + Environment.GetEnvironmentVariable("PATH"));
-            Directory.SetCurrentDirectory(S7Bin);
             try
             {
+                var s7Bin = FindS7Bin() ?? throw new DirectoryNotFoundException("STEP 7 S7BIN folder not found (set PCS7_S7BIN)");
+                Environment.SetEnvironmentVariable("PATH", s7Bin + ";" + Environment.GetEnvironmentVariable("PATH"));
+                Directory.SetCurrentDirectory(s7Bin);
                 if (args.Length == 0) throw new ArgumentException("command required: list | export");
                 var opts = Options(args.Skip(1).ToArray());
                 string Opt(string k) => opts.TryGetValue(k, out var v) ? v : null;
@@ -159,6 +158,25 @@ namespace Pcs7CfcReader
                 case 8: return "REAL";
                 default: return "code" + code.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        /// <summary>"Program Files (x86)" on 64-bit Windows, "Program Files" on 32-bit Windows 7; PCS7_S7BIN overrides.</summary>
+        private static string FindS7Bin()
+        {
+            var env = Environment.GetEnvironmentVariable("PCS7_S7BIN");
+            if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
+            foreach (var root in new[]
+                     {
+                         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                         @"C:\Program Files (x86)", @"C:\Program Files",
+                     })
+            {
+                if (string.IsNullOrEmpty(root)) continue;
+                var dir = Path.Combine(root, "SIEMENS", "STEP7", "S7BIN");
+                if (Directory.Exists(dir)) return dir;
+            }
+            return null;
         }
 
         private static Dictionary<string, string> Options(string[] args)

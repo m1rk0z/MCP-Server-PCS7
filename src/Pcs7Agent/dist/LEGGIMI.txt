@@ -1,0 +1,71 @@
+PCS7 MCP Agent
+==============
+
+Agente da installare sulla macchina (anche virtuale) dove e' installato PCS 7 / STEP 7 V5.x.
+Permette a Claude Code, in esecuzione su un altro PC, di lavorare sul progetto PCS 7
+attraverso il server MCP pcs7-mcp.
+
+  PC con Claude Code                         VM con PCS 7
+  +---------------------------+   HTTP      +------------------------------+
+  | Claude Code               |   + token   | Pcs7Agent (icona S7 in tray) |
+  |  -> Pcs7McpServer.exe     | ----------> |  -> SIMATIC Manager (COM)    |
+  |     --agent http://VM:8765|  porta 8765 |  -> database CFC             |
+  +---------------------------+             |  -> OPC UA OpenPCS 7         |
+                                            +------------------------------+
+
+Requisiti
+---------
+- Windows 7 SP1, 8.1, 10, 11 oppure Server 2008 R2 SP1 ... 2022, a 32 o 64 bit
+- .NET Framework 4.8 (setup.cmd lo verifica e indica dove scaricarlo)
+- PCS 7 / STEP 7 V5.x installato su questa stessa macchina
+- Diritti di amministratore solo per installare
+
+Installazione
+-------------
+1. Copiare lo zip sulla VM ed estrarlo TUTTO in una cartella.
+2. Eseguire setup.cmd (chiede i diritti di amministratore).
+3. Scegliere la porta (predefinita 8765), la modalita' (sola lettura consigliata)
+   e, se si vuole, l'IP del PC con Claude Code.
+4. Alla fine compare la configurazione da copiare sul PC: indirizzo, token
+   e il blocco da inserire in %USERPROFILE%\.claude.json.
+   Lo stesso testo e' salvato in C:\ProgramData\Pcs7Agent\client-config.txt.
+
+L'installazione:
+- copia il programma in "Program Files (x86)\Pcs7Agent" (o "Program Files" su Windows a 32 bit)
+- salva configurazione e token in C:\ProgramData\Pcs7Agent\agent.json
+  (modificabile solo dagli amministratori, leggibile dagli utenti locali)
+- registra l'URL http://+:PORTA/ per l'utente normale (netsh http urlacl)
+- apre la porta nel firewall di Windows (regola "PCS7 MCP Agent")
+- avvia l'agente a ogni accesso di un utente (non come servizio: SIMATIC Manager
+  deve girare nella sessione dell'utente, con il suo profilo e le licenze)
+
+Uso
+---
+L'agente parte all'accesso e mostra un'icona "S7" nell'area di notifica:
+  verde = sola lettura, arancione = lettura e scrittura, rosso = non attivo.
+Tasto destro sull'icona: configurazione per Claude Code, cartella export, log, esci.
+
+Esportazioni e log:   C:\ProgramData\Pcs7Agent\export   e   ...\logs
+Ogni richiesta ricevuta e' registrata nel log con IP, operazione ed esito.
+
+Sicurezza
+---------
+- Ogni richiesta deve avere il token; senza token l'agente risponde 401,
+  a un PC non presente tra i client consentiti risponde 403.
+- La modalita' read-only dell'agente blocca le scritture anche se il PC le chiede.
+- Download nel PLC, avvio/arresto CPU e cancellazioni non esistono nel protocollo.
+- Il traffico HTTP non e' cifrato: usare una rete privata o host-only tra PC e VM,
+  e indicare l'IP del PC in "IP client consentiti".
+
+Modificare le impostazioni: rieseguire setup.cmd (il token resta lo stesso,
+a meno di scegliere "Genera un nuovo token").
+
+Disinstallazione
+----------------
+Da "Programmi e funzionalita'" (PCS7 MCP Agent) oppure con disinstalla.cmd.
+
+OPC UA
+------
+L'agente si collega a opc.tcp://localhost:4863 (server OPC UA di OpenPCS 7).
+Per cambiare endpoint o credenziali modificare agent.json (da amministratore)
+(OpcUaEndpoint, OpcUaUser, OpcUaPassword, OpcUaUseSecurity) e riavviare l'agente.

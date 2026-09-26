@@ -7,11 +7,11 @@
   "targets": {
     ".NETCoreApp,Version=v8.0": {},
     ".NETCoreApp,Version=v8.0/win-x86": {
-      "Pcs7McpServer/1.0.0": {
+      "Pcs7McpServer/1.1.0": {
         "dependencies": {
           "Microsoft.Extensions.Hosting": "10.0.12",
           "ModelContextProtocol": "2.2.0",
-          "OPCFoundation.NetStandard.Opc.Ua.Client": "1.5.378.176",
+          "Pcs7Core": "1.1.0",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x86": "8.0.31"
         },
         "runtime": {
@@ -1284,11 +1284,23 @@
             "fileVersion": "10.0.1226.42308"
           }
         }
+      },
+      "Pcs7Core/1.1.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.4",
+          "OPCFoundation.NetStandard.Opc.Ua.Client": "1.5.378.176"
+        },
+        "runtime": {
+          "Pcs7Core.dll": {
+            "assemblyVersion": "1.1.0",
+            "fileVersion": "1.1.0.0"
+          }
+        }
       }
     }
   },
   "libraries": {
-    "Pcs7McpServer/1.0.0": {
+    "Pcs7McpServer/1.1.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -1619,6 +1631,11 @@
       "sha512": "sha512-AHlVpUiY96eC6Oar1Gf0YbafU7E2NUU9D80O2Xk5v7ryL3kpSsbI0EusJBE8kQfwPuDdUDoKUItArzXQHxomCg==",
       "path": "system.text.json/10.0.12",
       "hashPath": "system.text.json.10.0.12.nupkg.sha512"
+    },
+    "Pcs7Core/1.1.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
     }
   },
   "runtimes": {
