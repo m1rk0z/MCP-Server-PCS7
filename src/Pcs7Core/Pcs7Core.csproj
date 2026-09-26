@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared PCS 7 logic (SIMATIC command interface, CFC reader launcher, OPC UA client, operation dispatcher).
+    net48  -> Pcs7Agent on the PCS 7 machine (runs on Windows 7 SP1 ... Windows 11 / Server 2022)
+    net8.0 -> Pcs7McpServer in local mode (PCS 7 on the same machine as Claude Code)
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net48;net8.0-windows</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- SIMATIC Manager command interface (S7ABATCX.DLL) is a 32-bit in-proc COM server -->
+    <PlatformTarget>x86</PlatformTarget>
+    <AssemblyName>Pcs7Core</AssemblyName>
+    <RootNamespace>Pcs7Core</RootNamespace>
+    <Version>1.1.0</Version>
+    <NoWarn>$(NoWarn);CS0618;CS8632</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" Version="1.5.378.176" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

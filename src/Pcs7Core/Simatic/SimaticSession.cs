@@ -1,20 +1,31 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
-using Pcs7Mcp.Com;
-using static Pcs7Mcp.Com.ComObj;
+using System.Threading;
+using System.Threading.Tasks;
+using Pcs7Core.Com;
+using static Pcs7Core.Com.ComObj;
 
-namespace Pcs7Mcp.Simatic;
+namespace Pcs7Core.Simatic;
 
 /// <summary>
-/// Wraps the SIMATIC Manager command interface ("Simatic.Simatic", STEP 7 V5.7 / PCS 7 V10).
+/// Wraps the SIMATIC Manager command interface ("Simatic.Simatic", STEP 7 V5.x / PCS 7 V8 ... V10).
 /// Every public method marshals its work onto the STA thread.
 /// </summary>
 public sealed class SimaticSession
 {
     private readonly StaDispatcher _sta;
-    private readonly ServerOptions _options;
+    private readonly CoreOptions _options;
     private object? _simatic;
 
-    public SimaticSession(StaDispatcher sta, ServerOptions options)
+#if NET
+    // STEP 7 writes some exports in Windows-1252: .NET 8 needs the code page provider for it.
+    static SimaticSession() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+#endif
+
+    public SimaticSession(StaDispatcher sta, CoreOptions options)
     {
         _sta = sta;
         _options = options;
@@ -34,7 +45,7 @@ public sealed class SimaticSession
         {
             if (_simatic is not null) return _simatic;
             var type = Type.GetTypeFromProgID("Simatic.Simatic")
-                       ?? throw new InvalidOperationException("COM class 'Simatic.Simatic' not registered: is STEP 7 V5.7 / PCS 7 installed?");
+                       ?? throw new InvalidOperationException("COM class 'Simatic.Simatic' not registered: is STEP 7 V5.x / PCS 7 installed on this machine?");
             var obj = Activator.CreateInstance(type)!;
             Directory.CreateDirectory(LogDir);
             // No message boxes may ever be shown: nobody could acknowledge them.
@@ -201,8 +212,8 @@ public sealed class SimaticSession
             .Select(p => (obj: p.Obj, name: p.Name, path: p.Path, type: S7Constants.ProjectType(p.Type)))
             .Where(p => includeLibraries || p.type != "Library")
             .Where(p => string.IsNullOrWhiteSpace(filter)
-                        || p.name?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true
-                        || p.path?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true)
+                        || p.name.ContainsCI(filter)
+                        || p.path.ContainsCI(filter))
             .Select(p => details
                 ? DescribeProject(p.obj)
                 : new Dictionary<string, object?> { ["name"] = p.name, ["type"] = p.type, ["path"] = p.path })
@@ -245,10 +256,10 @@ public sealed class SimaticSession
         var container = RequireContainer(pr, kind);
         IEnumerable<object> all = Items(Get(container, "Next"));
         if (!string.IsNullOrWhiteSpace(filter))
-            all = all.Where(i => (Str(i, "Name") ?? "").Contains(filter, StringComparison.OrdinalIgnoreCase)
-                              || (TryGet<string>(i, "SymbolicName") ?? "").Contains(filter, StringComparison.OrdinalIgnoreCase));
+            all = all.Where(i => Str(i, "Name").ContainsCI(filter)
+                              || TryGet<string>(i, "SymbolicName").ContainsCI(filter));
         var total = TryGet<int>(Get(container, "Next")!, "Count");
-        var page = all.Skip(Math.Max(0, offset)).Take(Math.Clamp(limit, 1, 500)).Select(DescribeItem).ToList();
+        var page = all.Skip(Math.Max(0, offset)).Take(Compat.Clamp(limit, 1, 500)).Select(DescribeItem).ToList();
         return new { folder = Str(container, "Name"), totalInFolder = total, offset, returned = page.Count, items = page };
     }
 
@@ -267,7 +278,7 @@ public sealed class SimaticSession
             index = TryGet<object>(r, "Index")?.ToString(),
             mlfb = Str(r, "MLFB"),
             version = Str(r, "Version"),
-            modules = Modules(r, 1, Math.Clamp(maxDepth, 1, 4)),
+            modules = Modules(r, 1, Compat.Clamp(maxDepth, 1, 4)),
         }).ToList();
         return new { station = Str(st, "Name"), type = TryGet<int>(st, "Type"), racks };
     }
@@ -495,7 +506,7 @@ public sealed class SimaticSession
             file,
             bytes = new FileInfo(file).Length,
             truncated,
-            content = truncated ? text[.._options.MaxInlineChars] : text,
+            content = truncated ? text.Substring(0, _options.MaxInlineChars) : text,
         };
     }
 

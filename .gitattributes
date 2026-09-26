@@ -1,0 +1,3 @@
+# Windows scripts and texts for the VM package must keep CRLF on any clone
+*.cmd text eol=crlf
+src/Pcs7Agent/dist/*.txt text eol=crlf

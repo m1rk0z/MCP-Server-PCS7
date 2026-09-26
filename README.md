@@ -9,6 +9,13 @@ Non esiste un server MCP ufficiale Siemens per PCS 7: questo è nato per lavorar
 
 Sviluppato e provato su **PCS 7 V10.0 SP1 / STEP 7 V5.7**, Windows 10/11 x64.
 
+Funziona in due modi:
+
+- **locale**: PCS 7 è installato sullo stesso PC di Claude Code;
+- **remoto**: PCS 7 è su un'altra macchina, tipicamente una VM. Lì si installa **Pcs7Agent**
+  (da Windows 7 SP1 a Windows 11 / Server 2022), e il server MCP sul PC gli inoltra le operazioni
+  via HTTP con un token. Guida completa: [docs/agente-remoto.md](docs/agente-remoto.md).
+
 ## Cosa sa fare
 
 **Lettura** — elenco progetti e multiprogetti, struttura di stazioni e programmi, elenco di blocchi,
@@ -27,6 +34,13 @@ L'elenco completo degli strumenti è in [docs/pcs7-mcp.md](docs/pcs7-mcp.md).
 
 ## Come è fatto
 
+- **Pcs7Core** (`src/Pcs7Core`): tutta la logica PCS 7, compilata sia per .NET 8 (server in modalità locale)
+  sia per .NET Framework 4.8 (agente). Un unico dispatcher esegue le operazioni per nome, con gli stessi nomi
+  dei tool MCP, e rifiuta le scritture se la macchina PCS 7 è in sola lettura.
+- **Pcs7McpServer** (`src/Pcs7Mcp`): server MCP stdio per Claude Code; esegue le operazioni in-process
+  oppure le inoltra all'agente (`--agent`).
+- **Pcs7Agent** (`src/Pcs7Agent`): agente per la macchina PCS 7 con icona nella tray, endpoint HTTP con token
+  e installer integrato.
 - **Engineering**: interfaccia di comando COM `Simatic.Simatic` (`S7ABATCX.DLL`), in-process a 32 bit:
   per questo il server è compilato **x86**. Tutte le chiamate COM passano da un unico thread STA.
 - **Hardware**: interfacce `S7HCOM_X` (stazioni, rack, moduli, indirizzi, export/import `.cfg`).
@@ -39,7 +53,9 @@ L'elenco completo degli strumenti è in [docs/pcs7-mcp.md](docs/pcs7-mcp.md).
 
 ## Requisiti
 
-- PCS 7 V10.0 SP1 oppure STEP 7 V5.7 installato sulla stessa macchina (le interfacce COM sono locali)
+- PCS 7 / STEP 7 V5.x installato sulla macchina che esegue le operazioni (le interfacce COM sono locali):
+  lo stesso PC in modalità locale, la VM con Pcs7Agent in modalità remota
+- Sulla VM: .NET Framework 4.8 (Windows 7 SP1 ... 11, Server 2008 R2 SP1 ... 2022, 32 o 64 bit)
 - .NET 8 SDK per compilare (`winget install Microsoft.DotNet.SDK.8`)
 - Per i chart CFC: editor CFC del progetto **chiuso** durante la lettura
 - Per OPC UA: runtime OS attivo e servizio `OpcUaServerOpenPCS7` avviato
@@ -47,14 +63,16 @@ L'elenco completo degli strumenti è in [docs/pcs7-mcp.md](docs/pcs7-mcp.md).
 ## Compilazione
 
 ```
-cd src\Pcs7Mcp
-dotnet publish -c Release -o ..\..\release
-cd ..\Pcs7CfcReader
-dotnet publish -c Release -o ..\..\release\cfcreader
+.\build.ps1
 ```
 
-La cartella `release/` di questo pacchetto contiene già il risultato della pubblicazione
-(self-contained, .NET 8 x86), utile per provarlo senza compilare.
+Produce:
+
+- `release\` → `Pcs7McpServer.exe` per il PC (self-contained, .NET 8 x86) e `cfcreader\` per la modalità locale;
+- `release\agent\Pcs7Agent-<versione>.zip` → pacchetto da copiare sulla VM (`setup.cmd`, `LEGGIMI.txt`).
+
+La cartella `release/` di questo pacchetto contiene già il risultato della compilazione, utile per provarlo
+senza compilare.
 
 ## Registrazione in Claude Code
 
@@ -74,11 +92,21 @@ In `%USERPROFILE%\.claude.json`:
 
 Senza `--access-mode` il server parte in sola lettura.
 
+Con PCS 7 su una VM si aggiungono l'indirizzo dell'agente e il token (vedi [docs/agente-remoto.md](docs/agente-remoto.md)):
+
+```json
+"args": ["--access-mode", "read-only", "--agent", "http://192.168.56.10:8765"],
+"env": { "PCS7_MCP_AGENT_TOKEN": "<token mostrato dall'agente sulla VM>" }
+```
+
 | Argomento | Variabile d'ambiente | Default |
 |---|---|---|
 | `--access-mode read-only\|read-write` | `PCS7_MCP_ACCESS_MODE` | `read-only` |
 | `--workdir <dir>` | `PCS7_MCP_WORKDIR` | `%LOCALAPPDATA%\pcs7-mcp\export` |
-| `--opcua-endpoint <url>` | `PCS7_MCP_OPCUA_ENDPOINT` | `opc.tcp://localhost:4863` |
+| `--opcua-endpoint <url>` | `PCS7_MCP_OPCUA_ENDPOINT` | `opc.tcp://localhost:4863` (solo modalità locale) |
+| `--agent <url>` | `PCS7_MCP_AGENT_URL` | vuoto = modalità locale |
+| `--agent-token <token>` | `PCS7_MCP_AGENT_TOKEN` | obbligatorio con `--agent` |
+| `--agent-timeout <minuti>` | `PCS7_MCP_AGENT_TIMEOUT` | 30 |
 | – | `PCS7_MCP_OPCUA_USER`, `PCS7_MCP_OPCUA_PASSWORD` | accesso anonimo |
 | – | `PCS7_MCP_OPCUA_SECURITY=none` | prima si tenta un endpoint sicuro |
 
@@ -87,9 +115,13 @@ Export, log e file generati finiscono nella cartella di lavoro, in una sottocart
 ## Struttura del pacchetto
 
 ```
-src/Pcs7Mcp/          server MCP (.NET 8, x86)
+src/Pcs7Core/         logica PCS 7 condivisa (net48 + net8, x86)
+src/Pcs7Mcp/          server MCP (.NET 8, x86), modalità locale o remota
+src/Pcs7Agent/        agente per la VM PCS 7 (.NET Framework 4.8, x86) + setup.cmd
 src/Pcs7CfcReader/    lettore del database CFC (.NET Framework 4.8, x86)
-release/              binari già pubblicati
+build.ps1             compila tutto in release/
+release/              binari già pubblicati (release/agent/ = zip per la VM)
+docs/agente-remoto.md installazione e funzionamento con PCS 7 su VM
 docs/pcs7-mcp.md      architettura, elenco strumenti, note operative e test eseguiti
 docs/cfc-db-api.md    firme dell'API interna del database CFC
 ```
