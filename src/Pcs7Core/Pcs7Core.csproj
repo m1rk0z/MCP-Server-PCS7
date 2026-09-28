@@ -10,8 +10,11 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <!-- SIMATIC Manager command interface (S7ABATCX.DLL) is a 32-bit in-proc COM server -->
-    <PlatformTarget>x86</PlatformTarget>
+    <!--
+      AnyCPU library: the SIMATIC command interface needs a 32-bit process, which is set by the executables
+      (Pcs7McpServer: self-contained win-x86 runtime; Pcs7Agent: PlatformTarget x86).
+    -->
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <AssemblyName>Pcs7Core</AssemblyName>
     <RootNamespace>Pcs7Core</RootNamespace>
     <Version>1.1.0</Version>

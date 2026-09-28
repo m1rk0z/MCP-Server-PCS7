@@ -10,12 +10,12 @@ public sealed class OpcUaReadTools(IPcs7Backend pcs7)
 {
     private const string EndpointHelp = "OPC UA endpoint as seen from the PCS 7 machine (default opc.tcp://localhost:4863, OpenPCS 7 UA server)";
 
-    [McpServerTool(Name = "opc_status", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "opc_status", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Connects to the OpenPCS 7 OPC UA server (process runtime) and returns server state, product and namespaces. Requires the PCS 7 OS runtime to be active.")]
     public Task<string> Status([Description(EndpointHelp)] string? endpoint = null)
         => RunAsync(() => pcs7.InvokeAsync("opc_status", Args(new { endpoint })));
 
-    [McpServerTool(Name = "opc_browse", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "opc_browse", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Browses the child nodes (objects, variables) of an OPC UA node. Without nodeId starts from the Objects folder.")]
     public Task<string> Browse(
         [Description("NodeId to browse, e.g. ns=2;s=... (default Objects folder)")] string? nodeId = null,
@@ -23,7 +23,7 @@ public sealed class OpcUaReadTools(IPcs7Backend pcs7)
         [Description(EndpointHelp)] string? endpoint = null)
         => RunAsync(() => pcs7.InvokeAsync("opc_browse", Args(new { nodeId, maxResults, endpoint })));
 
-    [McpServerTool(Name = "opc_read", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "opc_read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Reads current values (value, type, quality, timestamp) of one or more OPC UA variables, e.g. PCS 7 tags.")]
     public Task<string> Read(
         [Description("NodeIds to read")] string[] nodeIds,
@@ -35,7 +35,7 @@ public sealed class OpcUaReadTools(IPcs7Backend pcs7)
 [McpServerToolType]
 public sealed class OpcUaWriteTools(IPcs7Backend pcs7)
 {
-    [McpServerTool(Name = "opc_write", Destructive = true),
+    [McpServerTool(Name = "opc_write", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false),
      Description("Writes a value to an OPC UA variable of the running process (e.g. a setpoint). ACTS ON THE LIVE PLANT. Previews first; executes only with confirm=true.")]
     public async Task<string> Write(
         [Description("NodeId of the variable")] string nodeId,

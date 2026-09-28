@@ -24,6 +24,10 @@ $running = Get-CimInstance Win32_Process -Filter "Name='Pcs7McpServer.exe'" -Err
     Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith([IO.Path]::GetFullPath($release), 'OrdinalIgnoreCase') }
 if ($running) { throw "Pcs7McpServer.exe is running from $release (PID $($running.ProcessId -join ', ')): close the Claude Code sessions using it first." }
 
+Write-Host '== Tests'
+& $dotnet test (Join-Path $PSScriptRoot 'tests\Pcs7Tests') -c Release --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { throw 'tests failed: nothing was published' }
+
 Write-Host '== MCP server (PC)'
 Get-ChildItem $release -Exclude 'agent' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
 Publish 'Pcs7Mcp' $release

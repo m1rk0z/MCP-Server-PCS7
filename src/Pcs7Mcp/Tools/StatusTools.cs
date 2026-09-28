@@ -8,7 +8,7 @@ namespace Pcs7Mcp.Tools;
 [McpServerToolType]
 public sealed class StatusTools(IPcs7Backend pcs7)
 {
-    [McpServerTool(Name = "pcs7_status", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "pcs7_status", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Shows where PCS 7 operations run (local, or remote agent on a VM) and the state of the PCS 7 machine: Windows version, access mode, SIMATIC command interface available, CFC reader, work folder. Use it first to check the connection.")]
     public Task<string> Status() => RunAsync(() => pcs7.StatusAsync());
 }

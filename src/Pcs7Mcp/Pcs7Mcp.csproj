@@ -5,9 +5,14 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- SIMATIC Manager command interface (S7ABATCX.DLL) is a 32-bit in-proc COM server -->
-    <PlatformTarget>x86</PlatformTarget>
+    <!--
+      SIMATIC Manager command interface (S7ABATCX.DLL) is a 32-bit in-proc COM server: the process must be 32-bit.
+      That is guaranteed by the self-contained win-x86 runtime (apphost + coreclr x86); the assembly itself stays
+      AnyCPU so that the test project (64-bit host) can load it. Always start Pcs7McpServer.exe, never "dotnet ...dll".
+    -->
     <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <!-- explicit: with a win-x86 RuntimeIdentifier the SDK would otherwise mark the assembly 32-bit-only -->
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <SelfContained>true</SelfContained>
     <AssemblyName>Pcs7McpServer</AssemblyName>
     <RootNamespace>Pcs7Mcp</RootNamespace>

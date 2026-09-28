@@ -8,7 +8,7 @@ namespace Pcs7Mcp.Tools;
 [McpServerToolType]
 public sealed class S7ReadTools(IPcs7Backend pcs7)
 {
-    [McpServerTool(Name = "s7_list_projects", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_list_projects", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Lists the projects, multiprojects and libraries registered in SIMATIC Manager (PCS 7 / STEP 7 V5.7).")]
     public Task<string> ListProjects(
         [Description("Optional text filter on project name or path")] string? filter = null,
@@ -16,13 +16,13 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("Also read author, comment, modification date and PCS 7 flag (slower: opens each project; combine with a filter)")] bool details = false)
         => RunAsync(() => pcs7.InvokeAsync("s7_list_projects", Args(new { filter, includeLibraries, details })));
 
-    [McpServerTool(Name = "s7_project_structure", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_project_structure", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Shows stations and S7 programs of a project, with the block/source/chart folders and item counts.")]
     public Task<string> ProjectStructure(
         [Description("Project name or project path (as returned by s7_list_projects)")] string project)
         => RunAsync(() => pcs7.InvokeAsync("s7_project_structure", Args(new { project })));
 
-    [McpServerTool(Name = "s7_list_objects", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_list_objects", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Lists blocks, sources or CFC/SFC charts of an S7 program, with type, symbol, language, author, comment and modification date. Paged.")]
     public Task<string> ListObjects(
         [Description("Project name or path")] string project,
@@ -33,7 +33,7 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("Max items to return (1-500, default 100)")] int limit = 100)
         => RunAsync(() => pcs7.InvokeAsync("s7_list_objects", Args(new { project, program, kind, filter, offset, limit })));
 
-    [McpServerTool(Name = "s7_object_details", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_object_details", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Returns the properties of a single block, source or chart.")]
     public Task<string> ObjectDetails(
         [Description("Project name or path")] string project,
@@ -42,7 +42,7 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("Object name (e.g. FB100, a source name or a chart name)")] string name)
         => RunAsync(() => pcs7.InvokeAsync("s7_object_details", Args(new { project, program, kind, name })));
 
-    [McpServerTool(Name = "s7_read_block_code", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_read_block_code", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Reads the code of one or more offline blocks by generating an STL source file (GenerateSource). The project is not modified; the file is written to the export folder and its content returned.")]
     public Task<string> ReadBlockCode(
         [Description("Project name or path")] string project,
@@ -51,7 +51,7 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("Also include the blocks called by these blocks")] bool includeUsedBlocks = false)
         => RunAsync(() => pcs7.InvokeAsync("s7_read_block_code", Args(new { project, program, blocks, includeUsedBlocks })));
 
-    [McpServerTool(Name = "s7_export_source", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_export_source", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Exports an STL/SCL/GRAPH source of the program to a file and returns its content.")]
     public Task<string> ExportSource(
         [Description("Project name or path")] string project,
@@ -59,7 +59,7 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("Source name")] string source)
         => RunAsync(() => pcs7.InvokeAsync("s7_export_source", Args(new { project, program, source })));
 
-    [McpServerTool(Name = "s7_export_symbols", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_export_symbols", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Exports the symbol table of a program (sdf, asc, dif or seq) and returns its content.")]
     public Task<string> ExportSymbols(
         [Description("Project name or path")] string project,
@@ -67,7 +67,7 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("File format: sdf (default), asc, dif, seq")] string format = "sdf")
         => RunAsync(() => pcs7.InvokeAsync("s7_export_symbols", Args(new { project, program, format })));
 
-    [McpServerTool(Name = "s7_station_hardware", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_station_hardware", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Reads the hardware configuration of a station: racks, modules, order numbers (MLFB), firmware versions and I/O addresses.")]
     public Task<string> StationHardware(
         [Description("Project name or path")] string project,
@@ -75,21 +75,21 @@ public sealed class S7ReadTools(IPcs7Backend pcs7)
         [Description("Submodule depth (1-4, default 2)")] int maxDepth = 2)
         => RunAsync(() => pcs7.InvokeAsync("s7_station_hardware", Args(new { project, station, maxDepth })));
 
-    [McpServerTool(Name = "s7_export_station", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_export_station", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Exports a station hardware configuration to a .cfg file (HW Config export format) and returns its content.")]
     public Task<string> ExportStation(
         [Description("Project name or path")] string project,
         [Description("Station name")] string station)
         => RunAsync(() => pcs7.InvokeAsync("s7_export_station", Args(new { project, station })));
 
-    [McpServerTool(Name = "s7_export_program_structure", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_export_program_structure", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Exports the block call structure of a program (DIF file) and returns its content.")]
     public Task<string> ExportProgramStructure(
         [Description("Project name or path")] string project,
         [Description("Program name or LogPath")] string program)
         => RunAsync(() => pcs7.InvokeAsync("s7_export_program_structure", Args(new { project, program })));
 
-    [McpServerTool(Name = "s7_cpu_state", ReadOnly = true, Idempotent = true),
+    [McpServerTool(Name = "s7_cpu_state", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
      Description("Reads online the operating state (RUN/STOP/...) of the CPU assigned to a program. Requires an online connection to the PLC; may take time if the PLC is unreachable.")]
     public Task<string> CpuState(
         [Description("Project name or path")] string project,

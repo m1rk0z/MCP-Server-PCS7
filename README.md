@@ -60,6 +60,21 @@ L'elenco completo degli strumenti è in [docs/pcs7-mcp.md](docs/pcs7-mcp.md).
 - Per i chart CFC: editor CFC del progetto **chiuso** durante la lettura
 - Per OPC UA: runtime OS attivo e servizio `OpcUaServerOpenPCS7` avviato
 
+## Test
+
+```
+dotnet test tests\Pcs7Tests
+```
+
+I test non richiedono PCS 7 né diritti di amministratore. Verificano:
+- che i tool dichiarino tutti e quattro gli hint MCP (`readOnly`, `destructive`, `idempotent`, `openWorld`)
+  coerenti con quello che fanno, e che i tool di scrittura mostrino solo l'anteprima senza `confirm`;
+- che ogni tool invii la propria operazione con argomenti accettati dal dispatcher;
+- che la sola lettura blocchi ogni scrittura e che i percorsi restino confinati nella cartella di lavoro;
+- il client remoto contro un finto agente HTTP: upload, download degli export, errori, date conservate.
+
+Se sulla macchina è installato SIMATIC, i test che eseguirebbero operazioni vere si saltano da soli.
+
 ## Compilazione
 
 ```
@@ -119,6 +134,7 @@ src/Pcs7Core/         logica PCS 7 condivisa (net48 + net8, x86)
 src/Pcs7Mcp/          server MCP (.NET 8, x86), modalità locale o remota
 src/Pcs7Agent/        agente per la VM PCS 7 (.NET Framework 4.8, x86) + setup.cmd
 src/Pcs7CfcReader/    lettore del database CFC (.NET Framework 4.8, x86)
+tests/Pcs7Tests/      test automatici (xUnit, senza PCS 7)
 build.ps1             compila tutto in release/
 release/              binari già pubblicati (release/agent/ = zip per la VM)
 docs/agente-remoto.md installazione e funzionamento con PCS 7 su VM
@@ -139,6 +155,5 @@ docs/cfc-db-api.md    firme dell'API interna del database CFC
 
 ## Licenza
 
-Non ancora definita: finché non viene aggiunto un file `LICENSE`, tutti i diritti sono riservati.
-Le librerie di terze parti incluse in `release/` hanno licenze proprie, elencate in
+[MIT](LICENSE). Le librerie di terze parti incluse in `release/` hanno licenze proprie, elencate in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

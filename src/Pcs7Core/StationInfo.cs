@@ -20,6 +20,8 @@ public static class StationInfo
             user = Environment.UserDomainName + "\\" + Environment.UserName,
             os = OsName(),
             os64Bit = Environment.Is64BitOperatingSystem,
+            // Must be false: the SIMATIC command interface is a 32-bit in-proc COM server.
+            process64Bit = Environment.Is64BitProcess,
             runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             accessMode = CoreOptions.AccessModeName(options.AccessMode),
             workDir = options.WorkDir,
