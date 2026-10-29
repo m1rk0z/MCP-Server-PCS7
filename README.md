@@ -142,6 +142,24 @@ docs/pcs7-mcp.md      architettura, elenco strumenti, note operative e test eseg
 docs/cfc-db-api.md    firme dell'API interna del database CFC
 ```
 
+## Skill
+
+Il repository è anche un plugin di Claude Code con skill che descrivono come usare il server in
+sicurezza, ricavate da lavori reali:
+
+| Skill | A cosa serve |
+|---|---|
+| `s7-modifica-sicura` | Modificare un programma S7 in produzione: confronto online/offline, import, compilazione e salvataggio con conferma, mai download |
+| `s7-diagnosi-vat` | Diagnosi in sola lettura, VAT in testo da incollare in SIMATIC Manager, registrazioni per guasti intermittenti |
+| `pcs7-cfc-lettura` | Seguire segnali e parametri nei chart CFC |
+
+```
+/plugin marketplace add m1rk0z/MCP-Server-PCS7
+/plugin install pcs7-skills@mcp-server-pcs7
+```
+
+Oppure con la CLI delle skill: `npx skills add m1rk0z/MCP-Server-PCS7`.
+
 ## Avvertenze
 
 - Il server agisce su progetti di automazione reali. La modalità di scrittura compila e salva

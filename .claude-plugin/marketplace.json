@@ -1,0 +1,16 @@
+{
+  "name": "mcp-server-pcs7",
+  "owner": {
+    "name": "m1rk0z"
+  },
+  "metadata": {
+    "description": "Skill per il server MCP pcs7 (STEP 7 V5 e PCS 7)."
+  },
+  "plugins": [
+    {
+      "name": "pcs7-skills",
+      "source": "./",
+      "description": "Skill per STEP 7 V5 e PCS 7 da usare con il server MCP pcs7."
+    }
+  ]
+}
