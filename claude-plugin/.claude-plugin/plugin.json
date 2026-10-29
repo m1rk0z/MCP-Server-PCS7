@@ -1,7 +1,7 @@
 {
   "name": "pcs7-skills",
   "description": "Skill per lavorare in sicurezza con STEP 7 V5 e PCS 7 tramite il server MCP pcs7: modifica di programmi in produzione, diagnosi e VAT, lettura dei chart CFC.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": { "name": "m1rk0z" },
   "repository": "https://github.com/m1rk0z/MCP-Server-PCS7",
   "license": "MIT",

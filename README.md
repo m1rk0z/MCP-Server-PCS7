@@ -140,6 +140,7 @@ release/              binari già pubblicati (release/agent/ = zip per la VM)
 docs/agente-remoto.md installazione e funzionamento con PCS 7 su VM
 docs/pcs7-mcp.md      architettura, elenco strumenti, note operative e test eseguiti
 docs/cfc-db-api.md    firme dell'API interna del database CFC
+claude-plugin/        plugin di Claude Code con le skill (marketplace in .claude-plugin/)
 ```
 
 ## Skill
