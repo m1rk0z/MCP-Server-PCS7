@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "pcs7-skills",
-      "source": "./",
+      "source": "./claude-plugin",
       "description": "Skill per STEP 7 V5 e PCS 7 da usare con il server MCP pcs7."
     }
   ]
