@@ -112,14 +112,20 @@ public sealed class RemoteTests : IDisposable
     /// <summary>Minimal Pcs7Agent: answers every POST/GET health with the given envelope, every file request with "content".</summary>
     private sealed class FakeAgent : IDisposable
     {
-        private readonly HttpListener _listener = new();
+        private HttpListener _listener = new();
 
         public FakeAgent(Func<JObject, JObject?> answer)
         {
-            var port = 18900 + Random.Shared.Next(0, 900);
-            Url = $"http://127.0.0.1:{port}";
-            _listener.Prefixes.Add(Url + "/");
-            _listener.Start();
+            // Windows reserves port ranges (Hyper-V, WSL) that differ from machine to machine and refuses them
+            // with "file in use": try a few ports instead of trusting one range.
+            for (int attempt = 0; ; attempt++)
+            {
+                var port = 20000 + Random.Shared.Next(0, 40000);
+                Url = $"http://127.0.0.1:{port}";
+                _listener.Prefixes.Add(Url + "/");
+                try { _listener.Start(); break; }
+                catch (HttpListenerException) when (attempt < 20) { _listener = new HttpListener(); }
+            }
             Task.Run(async () =>
             {
                 while (_listener.IsListening)

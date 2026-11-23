@@ -92,15 +92,42 @@ per disassemblaggio su CFC V10.0 SP1). Dettagli in [cfc-db-api.md](cfc-db-api.md
 
 | Tool | Cosa fa |
 |---|---|
-| `s7_import_source` | Importa file .awl/.scl nella cartella Sorgenti |
-| `s7_compile_source` | Compila una sorgente (crea/sovrascrive blocchi) |
+| `s7_import_source` | Importa file .awl/.scl nella cartella Sorgenti (`overwrite`, `keepSafe`) |
+| `s7_compile_source` | Compila una sorgente: crea i blocchi dichiarati; quelli esistenti solo con `overwrite=true` (`keepSafe`) |
 | `s7_compile_charts` | Compila tutti i chart CFC/SFC del programma |
 | `s7_compile_station` | Controllo consistenza o compilazione HW |
-| `s7_import_symbols` | Importa simboli (insert / overwrite-name / overwrite-operand) |
+| `s7_import_symbols` | Importa simboli (insert / overwrite-name / overwrite-operand), con confronto per i file `.sdf` (`keepSafe`) |
 | `s7_import_station` | Importa stazione da .cfg |
 | `s7_set_object_properties` | Commento/autore/famiglia di un oggetto |
 | `s7_save` | Salva le modifiche fatte via interfaccia di comando |
 | `opc_write` | Scrive un valore nel **processo in esercizio** |
+
+### Cosa viene sovrascritto: controlli prima della scrittura
+
+Compilare una sorgente e importare simboli sovrascrivono senza chiedere. Per questo il server legge
+prima cosa cambierebbe, sia nell'anteprima (`confirm=false`, campo `wouldDo`) sia di nuovo subito
+prima della scrittura: l'anteprima informa, non autorizza.
+
+- **`s7_compile_source`**: la sorgente viene esportata e se ne leggono le dichiarazioni
+  (`FUNCTION_BLOCK`, `FUNCTION`, `DATA_BLOCK`, `ORGANIZATION_BLOCK`, `TYPE`, con nome assoluto come
+  `FC 990` o simbolico). Ogni blocco dichiarato viene cercato nella cartella Blocchi per nome e per
+  simbolo. La compilazione è rifiutata se un blocco esiste e `overwrite` è `false` (default), se è
+  protetto da know-how, o se è in `keepSafe`. Una sorgente senza dichiarazioni leggibili (SCL
+  cifrato, GRAPH) si compila solo con `overwrite=true`, e mai se è indicato `keepSafe`.
+  La risposta riporta `declares`, `replaced`, `created`.
+- **`s7_import_symbols`**: per i file `.sdf` la tabella corrente viene esportata
+  (`<workdir>\<progetto>\symbols\<programma>_before_import.sdf`, che è anche la copia di riserva) e
+  confrontata con il file: simboli nuovi, invariati e conflitti per nome o per operando. Con
+  `overwrite-name` / `overwrite-operand` l'import è rifiutato se un conflitto riguarda un nome o un
+  operando in `keepSafe`. Per `.asc/.dif/.seq` il confronto non è disponibile.
+- **`s7_import_source`**: una sorgente esistente elencata in `keepSafe` non viene sostituita nemmeno
+  con `overwrite=true`; l'anteprima dice quali blocchi il file dichiara.
+
+Dalla versione 1.2.0 `s7_compile_source` **non sovrascrive più** un blocco esistente senza
+`overwrite=true`: prima lo faceva sempre.
+
+Non c'è un rifiuto "con CPU online": in STEP 7 V5 il progetto offline non ha uno stato online come
+in TIA Portal.
 
 ### Escluso volutamente
 
@@ -114,6 +141,10 @@ comandi H-System: operazioni ad alto rischio su impianto, da fare da SIMATIC Man
 - I nomi progetto non sono univoci (possono esistere due progetti con lo stesso nome): in quel caso usare il percorso.
 - Le cartelle hanno nomi localizzati (Blocks/Blocchi/Bausteine): i tool usano il tipo
   (`blocks`, `sources`, `charts`), non il nome.
+- La compilazione di una sorgente avvia l'editor AWL/SCL (`S7kafapx.exe`), che ha bisogno di un desktop:
+  da una sessione senza desktop (SSH, servizio) `s7_compile_source` resta in attesa senza errore. Il server va
+  avviato nella sessione interattiva dell'utente, come fa Pcs7Agent. Lettura, anteprime e import funzionano
+  anche senza desktop (verificato il 23/11/2026).
 - OPC UA: serve il runtime OS attivo (oggi il servizio `OpcUaServerOpenPCS7` è in pausa).
 
 ## Test eseguiti (16/09/2026)

@@ -44,6 +44,14 @@ arriva al download sia esattamente ciò che si voleva.
 7. **Import e compilazione**, ognuno prima in anteprima e poi con `confirm=true` dopo l'ok:
    `s7_import_source` (`overwrite` solo se richiesto) → `s7_compile_source` → leggere il log del
    compilatore (errori **e** avvisi) → `s7_save`.
+   - L'anteprima di `s7_compile_source` elenca in `wouldDo` i blocchi che la sorgente dichiara e
+     quali esistono già: mostrarli all'utente. Senza `overwrite=true` un blocco esistente fa
+     rifiutare la compilazione; `overwrite=true` si passa solo dopo l'ok dell'utente **su quei
+     blocchi**.
+   - Mettere in `keepSafe` i blocchi che non devono cambiare in nessun caso (DB con valori di
+     processo, blocchi di altri). I blocchi protetti da know-how non vengono mai sostituiti.
+   - Per i simboli usare un file `.sdf`: l'anteprima di `s7_import_symbols` mostra simboli nuovi e
+     conflitti, e la tabella corrente viene salvata prima dell'import.
 8. **Rileggere** con `s7_read_block_code` il blocco compilato e confrontarlo con il sorgente.
 9. **Consegna all'utente**: elenco esatto dei blocchi da scaricare, quelli da **non** scaricare (DB
    con valori di processo) e una VAT di verifica (skill `s7-diagnosi-vat`).
