@@ -16,7 +16,7 @@
     <SelfContained>true</SelfContained>
     <AssemblyName>Pcs7McpServer</AssemblyName>
     <RootNamespace>Pcs7Mcp</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
     <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>

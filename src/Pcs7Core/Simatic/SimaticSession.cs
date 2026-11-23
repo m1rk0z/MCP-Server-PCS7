@@ -385,6 +385,11 @@ public sealed class SimaticSession
     {
         var p = FindProject(project);
         var src = FindItem(RequireContainer(FindProgram(p, program), "sources"), source);
+        return FileResult(ExportSourceFile(p, src));
+    }
+
+    private string ExportSourceFile(object project, object src)
+    {
         var ext = S7Constants.SourceType(TryGet<int>(src, "ConcreteType")) switch
         {
             "SCL" or "SCL-Encrypted" => "scl",
@@ -392,10 +397,10 @@ public sealed class SimaticSession
             "GRAPH" => "gr7",
             _ => "awl"
         };
-        var file = ExportPath(p, "sources", $"{Str(src, "Name")}.{ext}");
+        var file = ExportPath(project, "sources", $"{Str(src, "Name")}.{ext}");
         if (File.Exists(file)) File.Delete(file);
         Call(src, "Export", file);
-        return FileResult(file);
+        return file;
     }
 
     public object ExportStation(string project, string station)
@@ -421,27 +426,142 @@ public sealed class SimaticSession
 
     // ------------------------------------------------------------------ write operations
 
-    public object ImportSource(string project, string program, string filePath, string? sourceName, bool overwrite)
+    // A write must know what it is about to overwrite. The plans below are computed the same way for the
+    // preview (confirm=false) and again right before the write: the preview informs, it does not authorize.
+
+    /// <summary>What importing a source would do: whether one with that name exists and what the file declares.</summary>
+    private Dictionary<string, object?> ImportSourcePlan(object container, string name, string? filePath, bool overwrite, IReadOnlyList<string> keepSafe)
+    {
+        object? existing = null;
+        try { existing = FindItem(container, name); } catch (ArgumentException) { }
+
+        string? refusal = null;
+        if (existing is not null)
+        {
+            if (SourceDeclarations.Listed(keepSafe, name)) refusal = $"Source '{name}' is listed in keepSafe: it is never replaced.";
+            else if (!overwrite) refusal = $"Source '{name}' already exists. Set overwrite=true to replace it.";
+        }
+
+        List<DeclaredBlock>? declares = null;
+        if (filePath is not null && File.Exists(filePath))
+            try { declares = SourceDeclarations.Parse(ReadText(filePath)); } catch { }
+
+        return new Dictionary<string, object?>
+        {
+            ["source"] = name,
+            ["exists"] = existing is not null,
+            ["declares"] = declares?.Select(d => new { keyword = d.Keyword, name = d.Name }).ToList(),
+            ["refusal"] = refusal,
+            ["_existing"] = existing,
+        };
+    }
+
+    private static string SourceNameFor(string? filePath, string? sourceName) =>
+        !string.IsNullOrWhiteSpace(sourceName) ? sourceName! :
+        !string.IsNullOrWhiteSpace(filePath) ? Path.GetFileNameWithoutExtension(filePath) :
+        throw new ArgumentException("Argument 'sourceName' or 'filePath' is required");
+
+    public object PreviewImportSource(string project, string program, string? filePath, string? sourceName, bool overwrite, IReadOnlyList<string> keepSafe)
+    {
+        var container = RequireContainer(FindProgram(FindProject(project), program), "sources");
+        var plan = ImportSourcePlan(container, SourceNameFor(filePath, sourceName), filePath, overwrite, keepSafe);
+        plan.Remove("_existing");
+        return plan;
+    }
+
+    public object ImportSource(string project, string program, string filePath, string? sourceName, bool overwrite, IReadOnlyList<string> keepSafe)
     {
         if (!File.Exists(filePath)) throw new FileNotFoundException("Source file not found", filePath);
         var p = FindProject(project);
         var container = RequireContainer(FindProgram(p, program), "sources");
-        var name = string.IsNullOrWhiteSpace(sourceName) ? Path.GetFileNameWithoutExtension(filePath) : sourceName!;
-        object? existing = null;
-        try { existing = FindItem(container, name); } catch (ArgumentException) { }
-        if (existing is not null)
-        {
-            if (!overwrite) throw new InvalidOperationException($"Source '{name}' already exists. Set overwrite=true to replace it.");
-            Call(existing, "Remove");
-        }
+        var name = SourceNameFor(filePath, sourceName);
+        var plan = ImportSourcePlan(container, name, filePath, overwrite, keepSafe);
+        if (plan["refusal"] is string refusal) throw new InvalidOperationException(refusal);
+        var existing = plan["_existing"];
+        if (existing is not null) Call(existing, "Remove");
         var added = Call(Get(container, "Next")!, "Add", name, S7Constants.SwSource, filePath)!;
-        return new { imported = DescribeItem(added), replacedExisting = existing is not null };
+        return new { imported = DescribeItem(added), replacedExisting = existing is not null, declares = plan["declares"] };
     }
 
-    public object CompileSource(string project, string program, string source)
+    /// <summary>
+    /// What compiling a source would create or overwrite. The source is exported and its declarations are matched
+    /// against the blocks folder, by absolute name (FC990) or by symbol.
+    /// </summary>
+    private Dictionary<string, object?> CompileSourcePlan(object project, object program, object src, bool overwrite, IReadOnlyList<string> keepSafe)
     {
-        var src = FindItem(RequireContainer(FindProgram(FindProject(project), program), "sources"), source);
-        return WithVerbLog(() => Call(src, "Compile"));
+        var declared = new List<DeclaredBlock>();
+        string? unreadable = null;
+        try { declared = SourceDeclarations.Parse(ReadText(ExportSourceFile(project, src))); }
+        catch (Exception ex) { unreadable = Describe(ex); }
+
+        var blocks = new List<(string Name, string? Symbol, bool Protected)>();
+        var container = FindContainer(program, S7Constants.ContainerTypeFromKind("blocks"));
+        if (container is not null && declared.Count > 0)
+            blocks = Items(Get(container, "Next"))
+                .Select(b => (Str(b, "Name") ?? "", TryGet<string>(b, "SymbolicName"), TryGet<bool>(b, "KnowHowProtection")))
+                .ToList();
+
+        var entries = new List<Dictionary<string, object?>>();
+        var reasons = new List<string>();
+        foreach (var d in declared)
+        {
+            var hit = blocks.FirstOrDefault(b => SourceDeclarations.SameName(b.Name, d.Name) || SourceDeclarations.SameName(b.Symbol, d.Name));
+            bool exists = hit.Name is not null;
+            bool safe = SourceDeclarations.Listed(keepSafe, d.Name, hit.Name, hit.Symbol);
+            entries.Add(new Dictionary<string, object?>
+            {
+                ["keyword"] = d.Keyword,
+                ["name"] = d.Name,
+                ["exists"] = exists,
+                ["block"] = exists ? hit.Name : null,
+                ["symbol"] = exists ? hit.Symbol : null,
+                ["knowHowProtected"] = exists && hit.Protected,
+                ["keepSafe"] = safe,
+            });
+            if (safe) reasons.Add($"'{d.Name}' is listed in keepSafe");
+            else if (exists && hit.Protected) reasons.Add($"'{d.Name}' ({hit.Name}) is know-how protected in the project");
+            else if (exists && !overwrite) reasons.Add($"'{d.Name}' ({hit.Name}) already exists");
+        }
+
+        string? refusal = null;
+        if (declared.Count == 0 && !overwrite)
+            refusal = "No block declaration could be read from this source" + (unreadable is null ? "" : $" ({unreadable})") +
+                      ", so the server cannot tell what compiling it would overwrite. Set overwrite=true to compile it anyway.";
+        else if (declared.Count == 0 && keepSafe.Count > 0)
+            refusal = "No block declaration could be read from this source, so keepSafe cannot be honoured: compile it from SIMATIC Manager.";
+        else if (reasons.Count > 0)
+            refusal = "Compiling this source would overwrite: " + string.Join("; ", reasons) +
+                      ". Nothing was compiled." + (reasons.Any(r => r.EndsWith("already exists")) ? " Set overwrite=true to replace existing blocks." : "");
+
+        return new Dictionary<string, object?>
+        {
+            ["source"] = Str(src, "Name"),
+            ["declares"] = entries,
+            ["replaces"] = entries.Where(e => (bool)e["exists"]!).Select(e => e["block"]).ToList(),
+            ["creates"] = entries.Where(e => !(bool)e["exists"]!).Select(e => e["name"]).ToList(),
+            ["refusal"] = refusal,
+        };
+    }
+
+    public object PreviewCompileSource(string project, string program, string source, bool overwrite, IReadOnlyList<string> keepSafe)
+    {
+        var p = FindProject(project);
+        var pr = FindProgram(p, program);
+        return CompileSourcePlan(p, pr, FindItem(RequireContainer(pr, "sources"), source), overwrite, keepSafe);
+    }
+
+    public object CompileSource(string project, string program, string source, bool overwrite, IReadOnlyList<string> keepSafe)
+    {
+        var p = FindProject(project);
+        var pr = FindProgram(p, program);
+        var src = FindItem(RequireContainer(pr, "sources"), source);
+        var plan = CompileSourcePlan(p, pr, src, overwrite, keepSafe);
+        if (plan["refusal"] is string refusal) throw new InvalidOperationException(refusal);
+        var result = WithVerbLog(() => Call(src, "Compile"));
+        result["declares"] = plan["declares"];
+        result["replaced"] = plan["replaces"];
+        result["created"] = plan["creates"];
+        return result;
     }
 
     public object CompileCharts(string project, string program)
@@ -456,12 +576,72 @@ public sealed class SimaticSession
         return WithVerbLog(() => Call(st, "Compile", consistencyCheckOnly ? 1 : 0));
     }
 
-    public object ImportSymbols(string project, string program, string filePath, string mode)
+    /// <summary>
+    /// What importing a symbol file would change. Only .sdf files can be compared: the current table is exported
+    /// (that file is also the way back) and matched against the file by name and by operand.
+    /// </summary>
+    private Dictionary<string, object?> ImportSymbolsPlan(object project, object program, string filePath, string mode, IReadOnlyList<string> keepSafe)
+    {
+        S7Constants.SymbolImportFlag(mode); // validates the mode
+        bool overwrites = !string.Equals(mode.Trim(), "insert", StringComparison.OrdinalIgnoreCase);
+        var plan = new Dictionary<string, object?> { ["program"] = Str(program, "LogPath"), ["mode"] = mode };
+
+        if (!string.Equals(Path.GetExtension(filePath), ".sdf", StringComparison.OrdinalIgnoreCase))
+        {
+            plan["compared"] = false;
+            plan["note"] = "Only .sdf files can be compared with the symbol table: what this import changes is not known beforehand.";
+            plan["refusal"] = overwrites && keepSafe.Count > 0
+                ? "keepSafe cannot be honoured for this file format: import an .sdf file, or use mode insert."
+                : null;
+            return plan;
+        }
+
+        var before = ExportPath(project, "symbols", $"{Str(program, "Name")}_before_import.sdf");
+        if (File.Exists(before)) File.Delete(before);
+        Call(Get(program, "SymbolTable")!, "Export", before);
+        var current = File.Exists(before) ? SourceDeclarations.ParseSdf(ReadText(before)) : new List<SymbolRow>();
+        var diff = SourceDeclarations.Diff(current, SourceDeclarations.ParseSdf(ReadText(filePath)));
+
+        var blocked = diff.Conflicts
+            .Where(c => SourceDeclarations.Listed(keepSafe, c.Current.Name, c.Incoming.Name) ||
+                        keepSafe.Any(k => SourceDeclarations.Operand(k) == c.Current.Operand || SourceDeclarations.Operand(k) == c.Incoming.Operand))
+            .ToList();
+
+        plan["compared"] = true;
+        plan["currentTableBackup"] = before;
+        plan["added"] = diff.Added.Count;
+        plan["unchanged"] = diff.Unchanged;
+        plan["conflicts"] = diff.Conflicts.Select(c => new
+        {
+            kind = c.Kind,
+            current = new { name = c.Current.Name, operand = c.Current.Operand, dataType = c.Current.DataType },
+            incoming = new { name = c.Incoming.Name, operand = c.Incoming.Operand, dataType = c.Incoming.DataType },
+        }).ToList();
+        plan["conflictsAre"] = overwrites ? "overwritten according to the mode" : "left as they are (mode insert only adds new symbols)";
+        plan["refusal"] = overwrites && blocked.Count > 0
+            ? "This import would change symbols listed in keepSafe: " +
+              string.Join("; ", blocked.Select(c => $"{c.Current.Name} ({c.Current.Operand})")) + ". Nothing was imported."
+            : null;
+        return plan;
+    }
+
+    public object PreviewImportSymbols(string project, string program, string filePath, string mode, IReadOnlyList<string> keepSafe)
     {
         if (!File.Exists(filePath)) throw new FileNotFoundException("Symbol file not found", filePath);
-        var pr = FindProgram(FindProject(project), program);
-        var count = Call(Get(pr, "SymbolTable")!, "Import", filePath, S7Constants.SymbolImportFlag(mode));
-        return new { program = Str(pr, "LogPath"), result = count, mode };
+        var p = FindProject(project);
+        return ImportSymbolsPlan(p, FindProgram(p, program), filePath, mode, keepSafe);
+    }
+
+    public object ImportSymbols(string project, string program, string filePath, string mode, IReadOnlyList<string> keepSafe)
+    {
+        if (!File.Exists(filePath)) throw new FileNotFoundException("Symbol file not found", filePath);
+        var p = FindProject(project);
+        var pr = FindProgram(p, program);
+        var plan = ImportSymbolsPlan(p, pr, filePath, mode, keepSafe);
+        if (plan["refusal"] is string refusal) throw new InvalidOperationException(refusal);
+        plan["result"] = Call(Get(pr, "SymbolTable")!, "Import", filePath, S7Constants.SymbolImportFlag(mode));
+        plan.Remove("refusal");
+        return plan;
     }
 
     public object ImportStation(string project, string filePath)
@@ -481,7 +661,7 @@ public sealed class SimaticSession
         return DescribeItem(item);
     }
 
-    private object WithVerbLog(Action action)
+    private Dictionary<string, object?> WithVerbLog(Action action)
     {
         Directory.CreateDirectory(LogDir);
         try { if (File.Exists(VerbLogPath)) File.Delete(VerbLogPath); } catch { }
@@ -490,7 +670,7 @@ public sealed class SimaticSession
         try { action(); }
         catch (Exception ex) { error = Describe(ex); }
         var log = File.Exists(VerbLogPath) ? ReadText(VerbLogPath) : "";
-        return new { success = error is null, error, log, logFile = VerbLogPath };
+        return new Dictionary<string, object?> { ["success"] = error is null, ["error"] = error, ["log"] = log, ["logFile"] = VerbLogPath };
     }
 
     // ------------------------------------------------------------------ files

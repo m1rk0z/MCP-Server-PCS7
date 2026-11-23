@@ -14,7 +14,7 @@
     <PlatformTarget>x86</PlatformTarget>
     <AssemblyName>Pcs7Agent</AssemblyName>
     <RootNamespace>Pcs7Agent</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Product>PCS7 MCP Agent</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

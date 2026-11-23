@@ -10,32 +10,40 @@ namespace Pcs7Mcp.Tools;
 public sealed class S7WriteTools(IPcs7Backend pcs7)
 {
     private const string FileHelp = "Absolute path of the file on this PC (sent to the PCS 7 machine automatically; a path that does not exist here is used as a path on the PCS 7 machine):";
-    private const string ConfirmHelp = "false (default) = preview only; true = execute (only after explicit user approval)";
+    private const string ConfirmHelp = "false (default) = preview only, with what would be replaced; true = execute (only after explicit user approval)";
+    private const string KeepSafeHelp = "Names that must never be replaced, whatever the other arguments say";
 
     [McpServerTool(Name = "s7_import_source", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false),
-     Description("Imports an STL/SCL source file from disk into the Sources folder of a program. Does not compile it.")]
+     Description("Imports an STL/SCL source file from disk into the Sources folder of a program. Does not compile it. The preview tells whether a source with that name exists and which blocks the file declares.")]
     public Task<string> ImportSource(
         [Description("Project name or path")] string project,
         [Description("Program name or LogPath")] string program,
         [Description(FileHelp + " .awl/.scl/.inp source file")] string filePath,
         [Description("Source name in the project (default: file name)")] string? sourceName = null,
         [Description("Replace an existing source with the same name")] bool overwrite = false,
+        [Description(KeepSafeHelp + " (source names)")] string[]? keepSafe = null,
         [Description(ConfirmHelp)] bool confirm = false)
     {
-        if (!confirm) return Task.FromResult(Preview("Import source into project", new { project, program, filePath, sourceName, overwrite }));
-        return RunAsync(() => pcs7.InvokeAsync("s7_import_source", Args(new { project, program, filePath, sourceName, overwrite })));
+        var args = Args(new { project, program, filePath, sourceName, overwrite, keepSafe });
+        if (!confirm) return PreviewAsync("Import source into project", new { project, program, filePath, sourceName, overwrite, keepSafe },
+            () => pcs7.InvokeAsync("s7_preview_import_source", args));
+        return RunAsync(() => pcs7.InvokeAsync("s7_import_source", args));
     }
 
     [McpServerTool(Name = "s7_compile_source", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false),
-     Description("Compiles an STL/SCL source of the program: creates or overwrites the blocks defined in it. Returns the compiler log.")]
+     Description("Compiles an STL/SCL source of the program: creates the blocks defined in it. A block that already exists is replaced only with overwrite=true, and never when it is know-how protected or listed in keepSafe: the server reads the declarations in the source first and refuses otherwise. Returns the compiler log and what was created or replaced.")]
     public Task<string> CompileSource(
         [Description("Project name or path")] string project,
         [Description("Program name or LogPath")] string program,
         [Description("Source name")] string source,
+        [Description("Replace blocks that already exist in the program (default false: refused)")] bool overwrite = false,
+        [Description(KeepSafeHelp + " (blocks, absolute like FC990 or symbolic)")] string[]? keepSafe = null,
         [Description(ConfirmHelp)] bool confirm = false)
     {
-        if (!confirm) return Task.FromResult(Preview("Compile source (blocks defined in it will be created/overwritten)", new { project, program, source }));
-        return RunAsync(() => pcs7.InvokeAsync("s7_compile_source", Args(new { project, program, source })));
+        var args = Args(new { project, program, source, overwrite, keepSafe });
+        if (!confirm) return PreviewAsync("Compile source (the blocks it declares are created or replaced)", new { project, program, source, overwrite, keepSafe },
+            () => pcs7.InvokeAsync("s7_preview_compile_source", args));
+        return RunAsync(() => pcs7.InvokeAsync("s7_compile_source", args));
     }
 
     [McpServerTool(Name = "s7_compile_charts", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false),
@@ -62,16 +70,19 @@ public sealed class S7WriteTools(IPcs7Backend pcs7)
     }
 
     [McpServerTool(Name = "s7_import_symbols", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false),
-     Description("Imports symbols from an sdf/asc/dif/seq file into the symbol table of a program.")]
+     Description("Imports symbols from an sdf/asc/dif/seq file into the symbol table of a program. For .sdf files the preview compares the file with the current table (new symbols, conflicts by name or operand) and the current table is exported first as a backup.")]
     public Task<string> ImportSymbols(
         [Description("Project name or path")] string project,
         [Description("Program name or LogPath")] string program,
         [Description(FileHelp + " symbol file")] string filePath,
         [Description("insert (only new symbols), overwrite-name or overwrite-operand")] string mode = "insert",
+        [Description(KeepSafeHelp + " (symbol names or operands like 'FC 990'; .sdf files only)")] string[]? keepSafe = null,
         [Description(ConfirmHelp)] bool confirm = false)
     {
-        if (!confirm) return Task.FromResult(Preview("Import symbols into symbol table", new { project, program, filePath, mode }));
-        return RunAsync(() => pcs7.InvokeAsync("s7_import_symbols", Args(new { project, program, filePath, mode })));
+        var args = Args(new { project, program, filePath, mode, keepSafe });
+        if (!confirm) return PreviewAsync("Import symbols into symbol table", new { project, program, filePath, mode, keepSafe },
+            () => pcs7.InvokeAsync("s7_preview_import_symbols", args));
+        return RunAsync(() => pcs7.InvokeAsync("s7_import_symbols", args));
     }
 
     [McpServerTool(Name = "s7_import_station", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false),

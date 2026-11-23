@@ -37,10 +37,20 @@ public sealed class Pcs7Operations : IDisposable
     /// <summary>Arguments that name a file to import.</summary>
     public static readonly IReadOnlyCollection<string> FileArguments = new[] { "filePath" };
 
-    /// <summary>Operations that accept an uploaded file (all of them are write operations).</summary>
+    /// <summary>
+    /// Read operations behind the preview step of a write tool: they tell what the write would overwrite.
+    /// They are not MCP tools of their own and never change the project.
+    /// </summary>
+    public static readonly IReadOnlyCollection<string> PreviewOperations = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "s7_preview_import_source", "s7_preview_compile_source", "s7_preview_import_symbols",
+    };
+
+    /// <summary>Operations that accept an uploaded file: the imports, and the previews that read the same file.</summary>
     public static readonly IReadOnlyCollection<string> UploadOperations = new HashSet<string>(StringComparer.Ordinal)
     {
         "s7_import_source", "s7_import_symbols", "s7_import_station",
+        "s7_preview_import_source", "s7_preview_import_symbols",
     };
 
     private static readonly TimeSpan UploadRetention = TimeSpan.FromDays(7);
@@ -65,7 +75,7 @@ public sealed class Pcs7Operations : IDisposable
 
     public CoreOptions Options => _options;
 
-    public static bool IsKnown(string op) => ReadOperations.Contains(op) || WriteOperations.Contains(op);
+    public static bool IsKnown(string op) => ReadOperations.Contains(op) || WriteOperations.Contains(op) || PreviewOperations.Contains(op);
 
     public static readonly IReadOnlyCollection<string> ReadOperations = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -117,12 +127,17 @@ public sealed class Pcs7Operations : IDisposable
         "opc_browse" => await _opc.BrowseAsync(a.OptStr("endpoint"), a.OptStr("nodeId"), a.Int("maxResults", 200)),
         "opc_read" => await _opc.ReadAsync(a.OptStr("endpoint"), a.StrArray("nodeIds")),
 
+        // ---- previews of a write: read only, same checks as the write itself
+        "s7_preview_import_source" => await S7(() => _s7.PreviewImportSource(a.Str("project"), a.Str("program"), a.OptStr("filePath"), a.OptStr("sourceName"), a.Bool("overwrite"), a.StrArray("keepSafe"))),
+        "s7_preview_compile_source" => await S7(() => _s7.PreviewCompileSource(a.Str("project"), a.Str("program"), a.Str("source"), a.Bool("overwrite"), a.StrArray("keepSafe"))),
+        "s7_preview_import_symbols" => await S7(() => _s7.PreviewImportSymbols(a.Str("project"), a.Str("program"), a.Str("filePath"), a.OptStr("mode") ?? "insert", a.StrArray("keepSafe"))),
+
         // ---- write (read-write mode only, checked above)
-        "s7_import_source" => await S7(() => _s7.ImportSource(a.Str("project"), a.Str("program"), a.Str("filePath"), a.OptStr("sourceName"), a.Bool("overwrite"))),
-        "s7_compile_source" => await S7(() => _s7.CompileSource(a.Str("project"), a.Str("program"), a.Str("source"))),
+        "s7_import_source" => await S7(() => _s7.ImportSource(a.Str("project"), a.Str("program"), a.Str("filePath"), a.OptStr("sourceName"), a.Bool("overwrite"), a.StrArray("keepSafe"))),
+        "s7_compile_source" => await S7(() => _s7.CompileSource(a.Str("project"), a.Str("program"), a.Str("source"), a.Bool("overwrite"), a.StrArray("keepSafe"))),
         "s7_compile_charts" => await S7(() => _s7.CompileCharts(a.Str("project"), a.Str("program"))),
         "s7_compile_station" => await S7(() => _s7.CompileStation(a.Str("project"), a.Str("station"), a.Bool("consistencyCheckOnly", true))),
-        "s7_import_symbols" => await S7(() => _s7.ImportSymbols(a.Str("project"), a.Str("program"), a.Str("filePath"), a.OptStr("mode") ?? "insert")),
+        "s7_import_symbols" => await S7(() => _s7.ImportSymbols(a.Str("project"), a.Str("program"), a.Str("filePath"), a.OptStr("mode") ?? "insert", a.StrArray("keepSafe"))),
         "s7_import_station" => await S7(() => _s7.ImportStation(a.Str("project"), a.Str("filePath"))),
         "s7_set_object_properties" => await S7(() => _s7.SetItemProperties(a.Str("project"), a.Str("program"), a.Str("kind"), a.Str("name"), a.OptStr("comment"), a.OptStr("author"), a.OptStr("family"))),
         "s7_save" => await S7(() => _s7.Save()),
