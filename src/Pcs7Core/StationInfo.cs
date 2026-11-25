@@ -15,7 +15,8 @@ public static class StationInfo
         return new
         {
             component,
-            version = typeof(StationInfo).Assembly.GetName().Version?.ToString(),
+            // The component's own version (agent or MCP server), not the shared library's.
+            version = (Assembly.GetEntryAssembly() ?? typeof(StationInfo).Assembly).GetName().Version?.ToString(),
             machine = Environment.MachineName,
             user = Environment.UserDomainName + "\\" + Environment.UserName,
             os = OsName(),

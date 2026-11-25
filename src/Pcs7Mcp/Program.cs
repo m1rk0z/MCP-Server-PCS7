@@ -34,7 +34,7 @@ else
     builder.Services.AddSingleton<IPcs7Backend>(_ => new LocalBackend(options));
 
 var mcp = builder.Services
-    .AddMcpServer(o => o.ServerInfo = new() { Name = "pcs7-mcp", Version = "1.1.0" })
+    .AddMcpServer(o => o.ServerInfo = new() { Name = "pcs7-mcp", Version = typeof(Program).Assembly.GetName().Version!.ToString(3) })
     .WithStdioServerTransport()
     .WithTools<StatusTools>()
     .WithTools<S7ReadTools>()
